@@ -16,7 +16,7 @@ required arguments:
   -target-field TARGET_FIELD                             the field name in the (target) records that should be used to write the information retrieved from the materialization request to the elasticsearch index (default: None)
 
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help                                                   show this help message and exit
   -elasticsearch-instance-host ELASTICSEARCH_INSTANCE_HOST     hostname or IP address of the elasticsearch instance to use (default: localhost)
   -elasticsearch-instance-port ELASTICSEARCH_INSTANCE_PORT     port of the elasticsearch instance to use (default: 9200)
   -target-field-is-multivalued                                 indicates, whether the target field should be a JSON array (for multiple values) or a JSON object / simple value (for single values); default is false, i.e., the retrieved values will be written into a JSON array (default: False)
@@ -54,7 +54,7 @@ apt-get install python-elasticsearch
 ## Run
 
 * install elasticsearch-py
-* clone this git repo or just download the ldjesmaterializer.py file
+* clone this git repo or just download the [ldjesmaterializer.py](ldjesmaterializer/ldjesmaterializer.py) file
 * run ./ldjesmaterializer.py
 * for a hackish way to use ldjesmaterializer system-wide, copy to /usr/local/bin
 
