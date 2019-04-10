@@ -119,6 +119,9 @@ def run():
                                                                  elasticsearch_index_name,
                                                                  elasticsearch_index_type)
 
+        if materialization_values is None:
+            continue
+
         if not target_field_is_singlevalued and not isinstance(materialization_values, list):
             json_record[target_field] = [materialization_values]
         elif target_field_is_singlevalued and isinstance(materialization_values, list) and len(materialization_values) == 1:
