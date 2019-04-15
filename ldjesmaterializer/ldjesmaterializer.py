@@ -57,6 +57,82 @@ def retrieve_materialization_values(seed_field,
     return materialization_values
 
 
+def retrieve_materialization_value_count(seed_field,
+                                         seed_value,
+                                         materialization_field,
+                                         elasticsearch_instance,
+                                         elasticsearch_index_name,
+                                         elasticsearch_index_type):
+    materialization_field_keyword = materialization_field + '.keyword'
+    seed_field_keyword = seed_field + '.keyword'
+    materialization_value_count_query = {"aggs": {"materialization_value_count": {"filter": {"bool": {
+        "must": [{"exists": {"field": materialization_field_keyword}}, {"match": {seed_field_keyword: seed_value}}]}},
+        "aggs": {"value_count": {
+            "value_count": {
+                "field": materialization_field_keyword}}}}}}
+    materialization_value_count_response = elasticsearch_instance.search(
+        index=elasticsearch_index_name,
+        doc_type=elasticsearch_index_type,
+        body=materialization_value_count_query,
+        size=0
+    )
+    materialization_value_count = \
+        materialization_value_count_response['aggregations']['materialization_value_count']['value_count'][
+            'value']
+
+    if materialization_value_count == 0:
+        return None
+
+    return materialization_value_count
+
+
+def add_materialization_values(elasticsearch_index_name,
+                               elasticsearch_index_type,
+                               elasticsearch_instance,
+                               json_record,
+                               materialization_field,
+                               seed_field,
+                               seed_value,
+                               target_field,
+                               target_field_is_singlevalued):
+    materialization_values = retrieve_materialization_values(seed_field,
+                                                             seed_value,
+                                                             materialization_field,
+                                                             elasticsearch_instance,
+                                                             elasticsearch_index_name,
+                                                             elasticsearch_index_type)
+    if materialization_values is not None:
+        if not target_field_is_singlevalued and not isinstance(materialization_values, list):
+            json_record[target_field] = [materialization_values]
+        elif target_field_is_singlevalued and isinstance(materialization_values, list) and len(
+                materialization_values) == 1:
+            json_record[target_field] = materialization_values[0]
+        else:
+            json_record[target_field] = materialization_values
+
+    return json_record
+
+
+def add_materialization_value_count(elasticsearch_index_name,
+                                    elasticsearch_index_type,
+                                    elasticsearch_instance,
+                                    json_record,
+                                    materialization_field,
+                                    seed_field,
+                                    seed_value,
+                                    target_field):
+    materialization_value_count = retrieve_materialization_value_count(seed_field,
+                                                                       seed_value,
+                                                                       materialization_field,
+                                                                       elasticsearch_instance,
+                                                                       elasticsearch_index_name,
+                                                                       elasticsearch_index_type)
+    if materialization_value_count is not None:
+        json_record[target_field] = materialization_value_count
+
+    return json_record
+
+
 def run():
     parser = argparse.ArgumentParser(prog='ldjesmaterializer',
                                      description='takes line-delimited JSON records and some arguments as input and materializes information from other records (stored in an elasticsearch index) into them',
@@ -91,6 +167,9 @@ def run():
     optional_arguments.add_argument('-target-field-is-singlevalued', action="store_true",
                                     dest='target_field_is_singlevalued',
                                     help='indicates, whether the target field should be a JSON array (for multiple values) or a JSON object / simple value (for single values); default is false, i.e., the retrieved values will be written into a JSON array')
+    optional_arguments.add_argument('-materialization-value-count-only', action="store_true",
+                                    dest='materialization_value_count_only',
+                                    help='indicates, whether the only the materialization value count should be written into the target field')
 
     parser._action_groups.append(optional_arguments)
 
@@ -105,6 +184,7 @@ def run():
     elasticsearch_index_name = args.elasticsearch_index_name
     elasticsearch_index_type = args.elasticsearch_index_type
     target_field_is_singlevalued = args.target_field_is_singlevalued
+    materialization_value_count_only = args.materialization_value_count_only
 
     elasticsearch_instance = Elasticsearch([{'host': elasticsearch_instance_host}], port=elasticsearch_instance_port)
 
@@ -112,22 +192,27 @@ def run():
         json_record = json.loads(line)
         seed_value = json_record[source_field]
 
-        materialization_values = retrieve_materialization_values(seed_field,
-                                                                 seed_value,
-                                                                 materialization_field,
-                                                                 elasticsearch_instance,
-                                                                 elasticsearch_index_name,
-                                                                 elasticsearch_index_type)
+        if not materialization_value_count_only:
+            enhanced_json_record = add_materialization_values(elasticsearch_index_name,
+                                                              elasticsearch_index_type,
+                                                              elasticsearch_instance,
+                                                              json_record,
+                                                              materialization_field,
+                                                              seed_field,
+                                                              seed_value,
+                                                              target_field,
+                                                              target_field_is_singlevalued)
+        else:
+            enhanced_json_record = add_materialization_value_count(elasticsearch_index_name,
+                                                                   elasticsearch_index_type,
+                                                                   elasticsearch_instance,
+                                                                   json_record,
+                                                                   materialization_field,
+                                                                   seed_field,
+                                                                   seed_value,
+                                                                   target_field)
 
-        if materialization_values is not None:
-            if not target_field_is_singlevalued and not isinstance(materialization_values, list):
-                json_record[target_field] = [materialization_values]
-            elif target_field_is_singlevalued and isinstance(materialization_values, list) and len(materialization_values) == 1:
-                json_record[target_field] = materialization_values[0]
-            else:
-                json_record[target_field] = materialization_values
-
-        sys.stdout.write(json.dumps(json_record, indent=None) + "\n")
+        sys.stdout.write(json.dumps(enhanced_json_record, indent=None) + "\n")
 
 
 if __name__ == "__main__":
