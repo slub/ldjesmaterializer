@@ -20,6 +20,7 @@ optional arguments:
   -elasticsearch-instance-host ELASTICSEARCH_INSTANCE_HOST     hostname or IP address of the elasticsearch instance to use (default: localhost)
   -elasticsearch-instance-port ELASTICSEARCH_INSTANCE_PORT     port of the elasticsearch instance to use (default: 9200)
   -target-field-is-multivalued                                 indicates, whether the target field should be a JSON array (for multiple values) or a JSON object / simple value (for single values); default is false, i.e., the retrieved values will be written into a JSON array (default: False)
+  -materialization-value-count-only                            indicates, whether the only the materialization value count should be written into the target field (default: False)
 ```
 
 * example:
