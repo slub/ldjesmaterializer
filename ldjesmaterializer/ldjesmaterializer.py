@@ -213,6 +213,9 @@ def run():
         json_record = json.loads(line)
         seed_value = json_record[source_field]
 
+        if seed_value is None:
+            continue
+
         if isinstance(seed_value, list):
             seed_values = seed_value
         else:
