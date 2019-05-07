@@ -92,23 +92,39 @@ def add_materialization_values(elasticsearch_index_name,
                                json_record,
                                materialization_field,
                                seed_field,
-                               seed_value,
+                               seed_values,
                                target_field,
                                target_field_is_singlevalued):
-    materialization_values = retrieve_materialization_values(seed_field,
-                                                             seed_value,
-                                                             materialization_field,
-                                                             elasticsearch_instance,
-                                                             elasticsearch_index_name,
-                                                             elasticsearch_index_type)
-    if materialization_values is not None:
-        if not target_field_is_singlevalued and not isinstance(materialization_values, list):
-            json_record[target_field] = [materialization_values]
-        elif target_field_is_singlevalued and isinstance(materialization_values, list) and len(
-                materialization_values) == 1:
-            json_record[target_field] = materialization_values[0]
+    all_materialization_values = []
+    for seed_value in seed_values:
+        materialization_values = retrieve_materialization_values(seed_field,
+                                                                 seed_value,
+                                                                 materialization_field,
+                                                                 elasticsearch_instance,
+                                                                 elasticsearch_index_name,
+                                                                 elasticsearch_index_type)
+        if materialization_values is not None:
+            all_materialization_values.append(materialization_values)
+
+    if len(all_materialization_values) > 0:
+        if len(all_materialization_values) == 1:
+            result_materialization_values = all_materialization_values[0]
         else:
-            json_record[target_field] = materialization_values
+            result_materialization_values = []
+            for materialization_value in all_materialization_values:
+                if isinstance(materialization_value, list):
+                    for single_materialization_value in materialization_value:
+                        result_materialization_values.append(single_materialization_value)
+                else:
+                    result_materialization_values.append(materialization_value)
+        # materialize result
+        if not target_field_is_singlevalued and not isinstance(result_materialization_values, list):
+            json_record[target_field] = [result_materialization_values]
+        elif target_field_is_singlevalued and isinstance(result_materialization_values, list) and len(
+                result_materialization_values) == 1:
+            json_record[target_field] = result_materialization_values[0]
+        else:
+            json_record[target_field] = result_materialization_values
 
     return json_record
 
@@ -119,16 +135,21 @@ def add_materialization_value_count(elasticsearch_index_name,
                                     json_record,
                                     materialization_field,
                                     seed_field,
-                                    seed_value,
+                                    seed_values,
                                     target_field):
-    materialization_value_count = retrieve_materialization_value_count(seed_field,
-                                                                       seed_value,
-                                                                       materialization_field,
-                                                                       elasticsearch_instance,
-                                                                       elasticsearch_index_name,
-                                                                       elasticsearch_index_type)
-    if materialization_value_count is not None:
-        json_record[target_field] = materialization_value_count
+    all_materialization_value_count = 0
+    for seed_value in seed_values:
+        materialization_value_count = retrieve_materialization_value_count(seed_field,
+                                                                           seed_value,
+                                                                           materialization_field,
+                                                                           elasticsearch_instance,
+                                                                           elasticsearch_index_name,
+                                                                           elasticsearch_index_type)
+        if materialization_value_count is not None:
+            all_materialization_value_count += materialization_value_count
+
+    if all_materialization_value_count > 0:
+        json_record[target_field] = all_materialization_value_count
 
     return json_record
 
@@ -192,6 +213,11 @@ def run():
         json_record = json.loads(line)
         seed_value = json_record[source_field]
 
+        if isinstance(seed_value, list):
+            seed_values = seed_value
+        else:
+            seed_values = [seed_value]
+
         if not materialization_value_count_only:
             enhanced_json_record = add_materialization_values(elasticsearch_index_name,
                                                               elasticsearch_index_type,
@@ -199,7 +225,7 @@ def run():
                                                               json_record,
                                                               materialization_field,
                                                               seed_field,
-                                                              seed_value,
+                                                              seed_values,
                                                               target_field,
                                                               target_field_is_singlevalued)
         else:
@@ -209,7 +235,7 @@ def run():
                                                                    json_record,
                                                                    materialization_field,
                                                                    seed_field,
-                                                                   seed_value,
+                                                                   seed_values,
                                                                    target_field)
 
         sys.stdout.write(json.dumps(enhanced_json_record, indent=None) + "\n")
